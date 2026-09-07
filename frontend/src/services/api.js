@@ -1,4 +1,5 @@
 import axios from 'axios';
+import storage, { TOKEN_KEY, USER_KEY } from './storage';
 
 // Empty baseURL => requests go to this origin (e.g. /api/...). The Vite dev
 // server proxies them to the FastAPI backend, so this works both locally and
@@ -8,22 +9,27 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach the JWT to every request
+const isAuthEndpoint = (url = '') => url.includes('/api/auth/login') || url.includes('/api/auth/signup');
+
+// Attach the JWT to every request. Must never throw: storage can be blocked.
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = storage.get(TOKEN_KEY);
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Clean up expired sessions on 401
+// Drop a session only when the server actually rejects the token.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    const status = error.response?.status;
+    // A wrong password returns 401 too — that must not wipe a valid session,
+    // and there is nothing to wipe during signup anyway.
+    if (status === 401 && !isAuthEndpoint(error.config?.url)) {
+      storage.remove(TOKEN_KEY);
+      storage.remove(USER_KEY);
     }
     return Promise.reject(error);
   }
