@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environment / secrets
+.env
+
+# SQLite runtime files (the seeded dev DB itself is tracked on purpose)
+database/*.db-wal
+database/*.db-shm
+database/*.db-journal
+
+# Node / frontend build output
+node_modules/
+dist/
+.vite/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
