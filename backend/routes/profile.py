@@ -4,44 +4,36 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models.user import User
 from ..models.student_profile import StudentProfile
-from ..schemas import ProfileRequest, ProfileResponse
-from ..auth import decode_token
+from ..schemas import ProfileRequest
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
 
 
-def get_current_user(authorization: str, db: Session):
-    """Extract user from Authorization header."""
-    token = authorization.replace("Bearer ", "") if authorization.startswith("Bearer ") else authorization
-    payload = decode_token(token)
-    if not payload:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = db.query(User).filter(User.id == int(payload["sub"])).first()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
+def _profile_payload(profile: StudentProfile) -> dict:
+    return {
+        "id": profile.id,
+        "user_id": profile.user_id,
+        "education": profile.education,
+        "year": profile.year,
+        "department": profile.department,
+        "selected_subject_id": profile.selected_subject_id,
+        "current_topic_index": profile.current_topic_index,
+        "learning_streak": profile.learning_streak,
+    }
 
 
 @router.get("/me")
 def get_profile(
-    authorization: str = Header(""),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(authorization, db)
-    profile = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
-    if not profile:
-        return {"profile": None, "user": {"id": user.id, "name": user.name, "email": user.email}}
+    """Return the current student's academic profile (or null if not set up yet)."""
+    profile = (
+        db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    )
     return {
-        "profile": {
-            "id": profile.id,
-            "user_id": profile.user_id,
-            "education": profile.education,
-            "year": profile.year,
-            "department": profile.department,
-            "selected_subject_id": profile.selected_subject_id,
-            "current_topic_index": profile.current_topic_index,
-            "learning_streak": profile.learning_streak,
-        },
+        "profile": _profile_payload(profile) if profile else None,
         "user": {"id": user.id, "name": user.name, "email": user.email},
     }
 
@@ -49,11 +41,13 @@ def get_profile(
 @router.post("/save")
 def save_profile(
     body: ProfileRequest,
-    authorization: str = Header(""),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(authorization, db)
-    profile = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    """Create or update the student's education / year / department selection."""
+    profile = (
+        db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    )
     if profile:
         profile.education = body.education
         profile.year = body.year
@@ -74,14 +68,29 @@ def save_profile(
 @router.post("/select-subject")
 def select_subject(
     subject_id: int,
-    authorization: str = Header(""),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user(authorization, db)
-    profile = db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    """Select the subject to study and reset progress to its first topic."""
+    from ..models.subject import Subject
+
+    subject = db.query(Subject).filter(Subject.id == subject_id).first()
+    if not subject:
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    profile = (
+        db.query(StudentProfile).filter(StudentProfile.user_id == user.id).first()
+    )
     if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found. Please set up your profile first.")
-    profile.selected_subject_id = subject_id
-    profile.current_topic_index = 0
+        raise HTTPException(
+            status_code=404,
+            detail="Profile not found. Please set up your profile first.",
+        )
+
+    # Re-selecting a different subject restarts the path; re-selecting the same
+    # one keeps the student's progress.
+    if profile.selected_subject_id != subject_id:
+        profile.selected_subject_id = subject_id
+        profile.current_topic_index = 0
     db.commit()
     return {"message": "Subject selected", "subject_id": subject_id}

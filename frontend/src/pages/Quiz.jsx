@@ -22,7 +22,7 @@ export default function Quiz() {
         quizAPI.questions(topicId),
       ]);
       setTopic(topicRes.data);
-      setQuestions(qRes.data);
+      setQuestions(qRes.data.questions || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,14 +119,61 @@ export default function Quiz() {
             </div>
           </div>
 
+          {/* Adaptive teaching style */}
+          {result.recommendation?.teaching_style_detail && (
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+              <h3 className="text-lg font-semibold text-white mb-3">
+                Adaptive AI Teacher — {result.recommendation.teaching_style_detail.label} mode
+              </h3>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                {['progression', 'examples', 'questions', 'explanation'].map((k) => (
+                  <div key={k} className="bg-slate-700/40 rounded-lg px-3 py-2">
+                    <dt className="text-slate-400 capitalize">{k}</dt>
+                    <dd className="text-slate-200">{result.recommendation.teaching_style_detail[k]}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          )}
+
+          {/* Per-question review — drives the weak-topic analysis */}
+          {result.review && (
+            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6 mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Answer Review</h3>
+              <div className="space-y-3">
+                {result.review.map((r, i) => (
+                  <div key={r.question_id} className={`rounded-lg border px-4 py-3 ${r.is_correct ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-red-500/40 bg-red-500/5'}`}>
+                    <p className="text-slate-200 text-sm">
+                      <span className={`font-bold mr-2 ${r.is_correct ? 'text-emerald-400' : 'text-red-400'}`}>
+                        Q{i + 1} {r.is_correct ? '\u2713' : '\u2717'}
+                      </span>
+                      {r.question}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Your answer: <span className="text-slate-200">{r.your_answer || 'none'}</span>
+                      {!r.is_correct && <> &middot; Correct: <span className="text-emerald-300">{r.correct_answer}</span></>}
+                    </p>
+                    {r.explanation && <p className="text-xs text-slate-500 mt-1">{r.explanation}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="flex gap-4 justify-center">
+          <div className="flex flex-wrap gap-4 justify-center">
             <Link to="/dashboard" className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition">
               Back to Dashboard
             </Link>
-            <Link to="/learning-path" className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
-              Continue Learning
-            </Link>
+            {result.next_topic ? (
+              <Link to={`/learn/${result.next_topic.id}`} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
+                Next Lesson: {result.next_topic.name}
+              </Link>
+            ) : (
+              <Link to={`/learn/${topicId}`} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium transition">
+                Revise This Topic
+              </Link>
+            )}
             <Link to="/qlearning" className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition">
               View Q-Learning Viz
             </Link>

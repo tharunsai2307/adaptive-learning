@@ -1,7 +1,8 @@
 """Pydantic schemas for request/response validation."""
 
-from pydantic import BaseModel, EmailStr
 from typing import Optional
+
+from pydantic import BaseModel, Field
 
 
 # ── Auth ───────────────────────────────────────────────────────────
@@ -11,14 +12,17 @@ class SignUpRequest(BaseModel):
     email: str
     password: str
 
+
 class LoginRequest(BaseModel):
     email: str
     password: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: dict
+
 
 # ── Profile ────────────────────────────────────────────────────────
 
@@ -26,6 +30,7 @@ class ProfileRequest(BaseModel):
     education: str = ""
     year: str = ""
     department: str = ""
+
 
 class ProfileResponse(BaseModel):
     id: int
@@ -37,6 +42,7 @@ class ProfileResponse(BaseModel):
     current_topic_index: int = 0
     learning_streak: int = 0
 
+
 # ── Subject ────────────────────────────────────────────────────────
 
 class SubjectResponse(BaseModel):
@@ -45,6 +51,8 @@ class SubjectResponse(BaseModel):
     department: str
     education: str
     year: str
+    topic_count: int = 0
+
 
 # ── Topic ──────────────────────────────────────────────────────────
 
@@ -62,9 +70,6 @@ class TopicResponse(BaseModel):
     resources: str
     study_time_minutes: int
 
-class TopicContentResponse(BaseModel):
-    topic: TopicResponse
-    teaching_style: str = "normal"
 
 # ── Quiz ───────────────────────────────────────────────────────────
 
@@ -76,31 +81,26 @@ class QuestionResponse(BaseModel):
     option_c: str
     option_d: str
 
+
 class QuizSubmitRequest(BaseModel):
     topic_id: int
-    answers: dict[str, str]  # {"question_id": "A", ...}
-    time_taken_seconds: int
+    answers: dict[str, str] = Field(default_factory=dict)  # {"question_id": "A", ...}
+    time_taken_seconds: int = 0
 
-class QuizResultResponse(BaseModel):
-    score: int
-    total_questions: int
-    accuracy: float
-    time_taken_seconds: int
-    performance_level: str
-    learning_speed: str
-    attempt_number: int
-    rl_action: str
-    recommendation: dict
-    q_learning_viz: dict
 
 # ── Tutor ──────────────────────────────────────────────────────────
 
 class TutorRequest(BaseModel):
     topic_id: int
     question: str
+    teaching_style: Optional[str] = None  # fast | normal | slow (auto if omitted)
+
 
 class TutorResponse(BaseModel):
     answer: str
+    teaching_style: str = "normal"
+    source: str = "offline"  # gemini | offline
+
 
 # ── Dashboard ──────────────────────────────────────────────────────
 
@@ -110,8 +110,10 @@ class DashboardResponse(BaseModel):
     stats: dict
     current_topic: Optional[dict] = None
     total_topics: int = 0
+    weak_topics: list = []
     recent_recommendation: Optional[dict] = None
     performance_history: list = []
+
 
 # ── Q-Learning Viz ────────────────────────────────────────────────
 
