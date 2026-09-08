@@ -27,3 +27,6 @@ class User(Base):
     recommendations: Mapped[list["Recommendation"]] = relationship(
         "Recommendation", back_populates="user", cascade="all, delete-orphan"
     )
+    q_rows: Mapped[list["QTable"]] = relationship(
+        "QTable", back_populates="user", cascade="all, delete-orphan"
+    )

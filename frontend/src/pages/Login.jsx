@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI, getErrorMessage } from '../services/api';
+import { BUILD } from '../version';
 
 export default function Login() {
   const [isSignup, setIsSignup] = useState(false);
@@ -22,7 +23,14 @@ export default function Login() {
       login(res.data.access_token, res.data.user);
       navigate('/profile');
     } catch (err) {
-      setError(getErrorMessage(err, 'Something went wrong'));
+      // Be specific: a network failure and a wrong password need different fixes.
+      const status = err?.response?.status;
+      if (!err?.response) {
+        setError('Could not reach the backend. Is the API running on port 8000?');
+      } else {
+        setError(`${getErrorMessage(err, 'Login failed')} (HTTP ${status})`);
+      }
+      console.error('Login failed:', err);
     } finally {
       setLoading(false);
     }
@@ -112,6 +120,9 @@ export default function Login() {
           <div className="mt-4 p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
             <p className="text-xs text-indigo-300 text-center">
               <strong>Demo:</strong> demo@adaptivelearn.com / demo123
+            </p>
+            <p className="text-[10px] text-indigo-400/50 text-center mt-1 font-mono">
+              build {BUILD}
             </p>
           </div>
         </div>

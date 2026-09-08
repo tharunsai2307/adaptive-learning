@@ -1,68 +1,87 @@
-"""AI Tutor service — uses Google Gemini API for chat and quiz generation."""
+"""AI Tutor service — Google Gemini for chat/quiz generation, with an offline fallback.
+
+The Gemini call is best-effort: if there is no API key, no network, or the API
+returns an error, the tutor answers from the seeded topic content instead of
+letting the exception bubble up as a 500.
+"""
 
 import json
+import logging
+
 import httpx
+
 from ..config import settings
+
+log = logging.getLogger(__name__)
 
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     "gemini-2.0-flash:generateContent"
 )
 
+TIMEOUT_SECONDS = 45
 
-async def _call_gemini(prompt: str) -> str:
-    """Send a prompt to Gemini and return the text response."""
+STYLE_HINTS = {
+    "fast": "Use advanced language, assume strong prior knowledge, be concise and go straight to the depth.",
+    "normal": "Use clear language with moderate detail and worked examples.",
+    "slow": "Use very simple language, break concepts into small steps, and give basic everyday examples.",
+}
+
+STYLE_LABELS = {"fast": "Accelerated", "normal": "Standard", "slow": "Supportive"}
+
+
+def is_gemini_configured() -> bool:
+    return bool(settings.GEMINI_API_KEY)
+
+
+async def _call_gemini(prompt: str) -> str | None:
+    """Send a prompt to Gemini. Returns None if it cannot be reached."""
     if not settings.GEMINI_API_KEY:
-        return _mock_response(prompt)
+        log.info("GEMINI_API_KEY not set — using the offline tutor.")
+        return None
 
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            GEMINI_URL,
-            params={"key": settings.GEMINI_API_KEY},
-            json={
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 2048,
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+            resp = await client.post(
+                GEMINI_URL,
+                params={"key": settings.GEMINI_API_KEY},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 2048,
+                    },
                 },
-            },
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        try:
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-        except (KeyError, IndexError):
-            return "I'm sorry, I couldn't generate a response. Please try again."
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except (httpx.HTTPError, OSError, ValueError) as exc:
+        log.warning("Gemini request failed (%s) — falling back to the offline tutor.", exc)
+        return None
+
+    try:
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError, TypeError):
+        log.warning("Unexpected Gemini response shape — falling back to the offline tutor.")
+        return None
 
 
-def _mock_response(prompt: str) -> str:
-    """Fallback mock response when no API key is configured."""
-    lower = prompt.lower()
-    if "quiz" in lower or "question" in lower:
-        return json.dumps(_generate_mock_questions())
-    if "explain" in lower or "what is" in lower:
-        return (
-            "That's a great question! Let me explain this concept step by step. "
-            "The key idea here is to understand the fundamental principles first, "
-            "then build on them with practical examples. "
-            "Would you like me to go deeper into any specific aspect?"
-        )
-    return (
-        "I understand your question. Based on the current topic, "
-        "here's what you should focus on: the core concepts, "
-        "practical applications, and how this connects to what you've "
-        "already learned. Let me know if you'd like more examples!"
-    )
+# ── Public API ─────────────────────────────────────────────────────
 
 
-async def ask_tutor(topic_name: str, question: str, teaching_style: str = "normal") -> str:
-    """Ask the AI tutor a question about the current topic."""
-    style_hints = {
-        "fast": "Use advanced language, assume strong prior knowledge, be concise.",
-        "normal": "Use clear language with moderate detail and examples.",
-        "slow": "Use very simple language, break concepts into small steps, give basic examples.",
-    }
-    style_hint = style_hints.get(teaching_style, style_hints["normal"])
+async def ask_tutor(
+    topic_name: str,
+    question: str,
+    teaching_style: str = "normal",
+    topic_content: dict | None = None,
+) -> tuple[str, str]:
+    """
+    Ask the AI tutor a question about the current topic.
+
+    Returns ``(answer, source)`` where source is ``"gemini"`` when the live
+    model answered and ``"offline"`` when the grounded fallback was used.
+    """
+    style_hint = STYLE_HINTS.get(teaching_style, STYLE_HINTS["normal"])
 
     prompt = (
         f"You are an AI tutor for the topic: '{topic_name}'.\n"
@@ -71,11 +90,76 @@ async def ask_tutor(topic_name: str, question: str, teaching_style: str = "norma
         "Provide a clear, helpful, and encouraging answer. "
         "Use examples where appropriate."
     )
-    return await _call_gemini(prompt)
+    answer = await _call_gemini(prompt)
+    if answer and answer.strip():
+        return answer.strip(), "gemini"
+    return (
+        _offline_answer(topic_name, question, teaching_style, topic_content or {}),
+        "offline",
+    )
 
 
-async def generate_quiz_questions(topic_name: str, topic_content: str, count: int = 10) -> list[dict]:
-    """Generate quiz questions for a topic using Gemini."""
+def _offline_answer(
+    topic_name: str, question: str, style: str, content: dict
+) -> str:
+    """
+    Grounded fallback answer built from the seeded topic content, so the tutor
+    still teaches something useful with no API key and no internet.
+    """
+    label = STYLE_LABELS.get(style, "Standard")
+    q = question.strip()
+    parts = [
+        f"(Offline tutor — {label} mode. Add GEMINI_API_KEY to .env for live AI answers.)",
+        f"Good question about **{topic_name}**: \"{q}\"",
+    ]
+
+    intro = content.get("introduction")
+    explanation = content.get("explanation")
+    key_points = content.get("key_points")
+    basic = content.get("basic_example")
+    advanced = content.get("advanced_example")
+
+    if intro:
+        parts.append(f"\n**The core idea**\n{intro}")
+
+    if explanation:
+        # Keep it digestible in a chat bubble.
+        excerpt = explanation if len(explanation) <= 900 else explanation[:900] + "..."
+        parts.append(f"\n**Explanation**\n{excerpt}")
+
+    if style == "slow":
+        if basic:
+            parts.append(f"\n**A simple example**\n{basic}")
+        parts.append(
+            "\nTake this one step at a time — re-read the explanation above, "
+            "then try the quiz. You can retake it as many times as you need."
+        )
+    elif style == "fast":
+        if advanced:
+            parts.append(f"\n**Going deeper**\n{advanced}")
+        parts.append(
+            "\nSince you are moving quickly, focus on the edge cases and how "
+            "this connects to the next topic."
+        )
+    else:
+        if basic:
+            parts.append(f"\n**Example**\n{basic}")
+        if advanced:
+            parts.append(f"\n**Advanced example**\n{advanced}")
+
+    if key_points:
+        parts.append(f"\n**Key points**\n{key_points}")
+
+    parts.append(
+        "\nWant me to go deeper on any part of this, or shall we move on to the quiz?"
+    )
+    return "\n".join(parts)
+
+
+async def generate_quiz_questions(
+    topic_name: str, topic_content: str, count: int = 10
+) -> list[dict]:
+    """Generate quiz questions for a topic, falling back to a built-in bank."""
     prompt = (
         f"Generate exactly {count} multiple-choice quiz questions for the topic: '{topic_name}'.\n"
         f"Topic content summary: {topic_content[:1000]}\n\n"
@@ -87,30 +171,57 @@ async def generate_quiz_questions(topic_name: str, topic_content: str, count: in
         "Vary difficulty across questions. Return ONLY the JSON array, no other text."
     )
     result = await _call_gemini(prompt)
+    if result:
+        parsed = _parse_questions(result)
+        if parsed:
+            return parsed[:count]
 
-    # Try to parse JSON from the response
-    try:
-        # Strip markdown code fences if present
-        cleaned = result.strip()
-        if cleaned.startswith("```"):
-            lines = cleaned.split("\n")
-            cleaned = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
-        questions = json.loads(cleaned)
-        if isinstance(questions, list) and len(questions) > 0:
-            return questions[:count]
-    except (json.JSONDecodeError, TypeError):
-        pass
-
-    # Fallback to hardcoded questions
     return _generate_hardcoded_questions(topic_name)
 
 
-def _generate_mock_questions() -> list[dict]:
-    return _generate_hardcoded_questions("General")
+def _parse_questions(raw: str) -> list[dict]:
+    """Parse a JSON array of questions out of a model response."""
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.split("\n")
+        cleaned = (
+            "\n".join(lines[1:-1])
+            if lines[-1].strip().startswith("```")
+            else "\n".join(lines[1:])
+        )
+
+    try:
+        questions = json.loads(cleaned)
+    except (json.JSONDecodeError, TypeError):
+        # Some models wrap the array in prose — grab the outermost [...] block.
+        start, end = cleaned.find("["), cleaned.rfind("]")
+        if start == -1 or end <= start:
+            return []
+        try:
+            questions = json.loads(cleaned[start : end + 1])
+        except (json.JSONDecodeError, TypeError):
+            return []
+
+    if not isinstance(questions, list):
+        return []
+
+    valid = []
+    for q in questions:
+        if not isinstance(q, dict):
+            continue
+        required = ("question", "option_a", "option_b", "option_c", "option_d", "correct_answer")
+        if not all(str(q.get(k, "")).strip() for k in required):
+            continue
+        if str(q["correct_answer"]).strip().upper() not in ("A", "B", "C", "D"):
+            continue
+        q["correct_answer"] = str(q["correct_answer"]).strip().upper()
+        q.setdefault("explanation", "")
+        valid.append(q)
+    return valid
 
 
 def _generate_hardcoded_questions(topic_name: str) -> list[dict]:
-    """Fallback hardcoded questions for when Gemini is unavailable."""
+    """Fallback question bank used when Gemini is unavailable."""
     return [
         {
             "question": f"What is the primary focus of {topic_name}?",

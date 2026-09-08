@@ -7,162 +7,209 @@ from .models.subject import Subject
 from .models.topic import Topic
 from .models.question import Question
 from .auth import hash_password
+from .curriculum import curriculum_for
 
 
 def seed_demo_data():
-    """Create demo student + ML subject with topics and questions if they don't exist."""
+    """Seed the demo student/ML content and curriculum content for every subject."""
     db: Session = SessionLocal()
     try:
-        # Skip if already seeded
-        if db.query(Subject).filter(Subject.name == "Machine Learning").first():
-            return
-
-        # ── Demo User ──────────────────────────────────────────────
-        demo_user = User(
-            name="Demo Student",
-            email="demo@adaptivelearn.com",
-            password=hash_password("demo123"),
-        )
-        db.add(demo_user)
-        db.flush()
-
-        # ── Subjects ───────────────────────────────────────────────
-        ml_subject = Subject(
-            name="Machine Learning",
-            department="Information Technology",
-            education="B.Tech",
-            year="2nd Year",
-        )
-        db.add(ml_subject)
-        db.flush()
-
-        # Additional subjects for variety
-        for subj_data in [
-            ("Python Programming", "Computer Science", "B.Tech", "1st Year"),
-            ("Data Structures", "Computer Science", "B.Tech", "2nd Year"),
-            ("Database Management Systems", "Information Technology", "B.Tech", "2nd Year"),
-            ("Computer Networks", "Information Technology", "B.Tech", "3rd Year"),
-            ("Operating Systems", "Computer Science", "B.Tech", "3rd Year"),
-            ("Python Programming", "Computer Science", "BCA", "1st Year"),
-            ("Data Structures", "Information Technology", "BCA", "2nd Year"),
-            ("Machine Learning", "Computer Science", "MCA", "2nd Year"),
-        ]:
-            db.add(Subject(name=subj_data[0], department=subj_data[1], education=subj_data[2], year=subj_data[3]))
-
-        # ── ML Topics ──────────────────────────────────────────────
-        topics_data = [
-            {
-                "name": "Introduction to Machine Learning",
-                "difficulty": "easy",
-                "order_number": 1,
-                "description": "Understand what Machine Learning is, its history, types, and applications.",
-                "introduction": "Machine Learning is a subset of Artificial Intelligence that enables systems to learn and improve from experience without being explicitly programmed. It focuses on developing algorithms that can access data and use it to learn for themselves.",
-                "explanation": "Machine Learning (ML) is the science of teaching computers to recognize patterns in data and make decisions with minimal human intervention. Instead of writing explicit rules, we provide examples (training data), and the algorithm figures out the rules on its own.\n\nThere are three main types:\n1. **Supervised Learning** — Learning from labeled examples (e.g., classifying emails as spam or not spam)\n2. **Unsupervised Learning** — Finding hidden patterns in unlabeled data (e.g., grouping customers by behavior)\n3. **Reinforcement Learning** — Learning through trial and error with rewards (e.g., a robot learning to walk)",
-                "basic_example": "Imagine you want to teach a computer to distinguish between apples and oranges. Instead of writing rules about color, size, and shape, you show it hundreds of labeled images of apples and oranges. The computer learns the patterns itself — this is Machine Learning in its simplest form.",
-                "advanced_example": "Netflix uses ML to recommend shows. It analyzes your viewing history, compares it with millions of other users, and predicts what you'd enjoy watching next. The algorithm continuously improves as more data becomes available, making recommendations more accurate over time.",
-                "key_points": "• ML is a subset of AI focused on learning from data\n• Three main types: Supervised, Unsupervised, Reinforcement\n• Requires quality data for good performance\n• Used in recommendation systems, image recognition, NLP, and more\n• The model improves with more data and experience",
-                "resources": "• Andrew Ng's Machine Learning Course (Coursera)\n• 'Hands-On Machine Learning' by Aurélien Géron\n• scikit-learn documentation\n• Google ML Crash Course",
-                "study_time_minutes": 30,
-            },
-            {
-                "name": "Supervised Learning",
-                "difficulty": "easy",
-                "order_number": 2,
-                "description": "Learn about supervised learning: classification, regression, training, and evaluation.",
-                "introduction": "Supervised Learning is the most common type of Machine Learning. In supervised learning, the algorithm learns from labeled training data — each example comes with the correct answer (label). The goal is to learn a mapping function from inputs to outputs.",
-                "explanation": "In Supervised Learning, we train a model using input-output pairs. Think of it like a student learning with an answer key.\n\n**Two main categories:**\n1. **Classification** — Predicting a category (discrete output)\n   - Email spam detection (spam / not spam)\n   - Image classification (cat / dog / bird)\n   - Disease diagnosis (positive / negative)\n\n2. **Regression** — Predicting a number (continuous output)\n   - House price prediction\n   - Temperature forecasting\n   - Stock price estimation\n\n**Key concepts:**\n- **Training Set** — Data used to train the model\n- **Test Set** — Data used to evaluate performance\n- **Overfitting** — Model memorizes training data but fails on new data\n- **Underfitting** — Model is too simple to capture patterns",
-                "basic_example": "A teacher shows a student 100 flashcards with animals and their names. After studying these labeled examples, the student can identify new animals they've never seen before. This is how supervised learning works — learning from labeled examples.",
-                "advanced_example": "A bank wants to predict loan defaults. They use historical data (income, credit score, employment history → defaulted or not) to train a classifier. The model learns patterns: low credit score + high debt = likely default. When a new application comes in, the model predicts the probability of default.",
-                "key_points": "• Uses labeled training data (input → output pairs)\n• Classification predicts categories, Regression predicts numbers\n• Requires splitting data into training and test sets\n• Watch out for overfitting and underfitting\n• Common algorithms: Linear Regression, Decision Trees, SVM, Neural Networks",
-                "resources": "• StatQuest YouTube series on ML\n• 'Pattern Recognition and Machine Learning' by Bishop\n• Kaggle supervised learning tutorials\n• scikit-learn classification and regression guides",
-                "study_time_minutes": 35,
-            },
-            {
-                "name": "Regression",
-                "difficulty": "medium",
-                "order_number": 3,
-                "description": "Understand regression techniques: linear regression, polynomial regression, and evaluation metrics.",
-                "introduction": "Regression is a supervised learning technique used to predict continuous numerical values. The most common form is Linear Regression, which finds the best-fit line through the data points.",
-                "explanation": "Regression helps us answer 'how much?' or 'how many?' questions.\n\n**Linear Regression:**\n- Finds the equation: y = mx + b (a straight line)\n- 'm' is the slope (how much y changes per unit of x)\n- 'b' is the intercept (value of y when x = 0)\n- Goal: minimize the error between predicted and actual values\n\n**Evaluation Metrics:**\n- **MSE** (Mean Squared Error) — Average of squared differences\n- **RMSE** (Root Mean Squared Error) — Square root of MSE\n- **R² Score** — How well the model fits (1.0 = perfect)\n\n**Polynomial Regression:**\n- When data isn't linear, we can fit a curve\n- Uses polynomial features (x², x³, etc.)\n- More flexible but risks overfitting",
-                "basic_example": "Predicting house prices based on size. If you plot size (x-axis) vs price (y-axis), linear regression draws the best straight line through all the data points. A 1000 sq ft house might be predicted at $200,000, a 2000 sq ft at $400,000, etc.",
-                "advanced_example": "A company predicts monthly revenue using multiple features: advertising spend, number of employees, and season. This is Multiple Linear Regression: Revenue = β₀ + β₁(ads) + β₂(employees) + β₃(season). Each coefficient tells how much that factor contributes to revenue.",
-                "key_points": "• Predicts continuous numerical values\n• Linear Regression finds the best-fit line\n- Key metrics: MSE, RMSE, R² Score\n• Polynomial Regression handles non-linear data\n• Multiple Regression uses multiple input features",
-                "resources": "• Khan Academy — Regression analysis\n• 'An Introduction to Statistical Learning' (Chapter 3)\n• StatQuest: Linear Regression playlist\n• scikit-learn Linear Regression tutorial",
-                "study_time_minutes": 40,
-            },
-            {
-                "name": "Classification",
-                "difficulty": "medium",
-                "order_number": 4,
-                "description": "Learn classification algorithms: logistic regression, KNN, and evaluation metrics.",
-                "introduction": "Classification is a supervised learning technique used to predict discrete categories or classes. It assigns data points to one of several predefined groups based on their features.",
-                "explanation": "Classification answers 'which category?' questions.\n\n**Common Algorithms:**\n1. **Logistic Regression** — Despite the name, it's for classification. Uses sigmoid function to output probabilities between 0 and 1.\n2. **K-Nearest Neighbors (KNN)** — Classifies based on the majority class of K nearest data points.\n3. **Support Vector Machine (SVM)** — Finds the best boundary (hyperplane) between classes.\n\n**Evaluation Metrics:**\n- **Accuracy** — % of correct predictions\n- **Precision** — Of all positive predictions, how many were correct?\n- **Recall** — Of all actual positives, how many did we catch?\n- **F1 Score** — Harmonic mean of Precision and Recall\n- **Confusion Matrix** — Table showing true/false positives and negatives",
-                "basic_example": "Email spam detection: The algorithm looks at features like sender address, subject line keywords, and attachments. Based on patterns from thousands of labeled emails, it classifies new emails as 'spam' or 'not spam'.",
-                "advanced_example": "A hospital uses classification to predict whether a tumor is benign or malignant. Features include size, shape, texture, and growth rate. The model (e.g., SVM) learns from thousands of past cases. High recall is critical here — missing a malignant tumor (false negative) is far worse than a false alarm.",
-                "key_points": "• Predicts discrete categories/classes\n• Logistic Regression uses sigmoid for probability output\n• KNN classifies by majority vote of nearest neighbors\n• Key metrics: Accuracy, Precision, Recall, F1 Score\n• Confusion Matrix provides detailed error analysis",
-                "resources": "• 'StatQuest: Classification' YouTube series\n• scikit-learn classification guide\n• Kaggle Titanic classification challenge\n• Andrew Ng's classification lecture notes",
-                "study_time_minutes": 40,
-            },
-            {
-                "name": "Decision Trees",
-                "difficulty": "medium",
-                "order_number": 5,
-                "description": "Understand decision trees, splitting criteria, pruning, and ensemble methods.",
-                "introduction": "Decision Trees are versatile ML algorithms that can be used for both classification and regression. They work by recursively splitting the data based on feature values, creating a tree-like structure of decisions.",
-                "explanation": "A Decision Tree is like a flowchart of questions that lead to a decision.\n\n**How it works:**\n1. Start at the root node (all data)\n2. Find the best feature to split on (maximizes information gain)\n3. Split the data into subsets\n4. Repeat for each subset (recursive splitting)\n5. Stop when a condition is met (max depth, min samples)\n\n**Splitting Criteria:**\n- **Gini Impurity** — Measures how often a random element would be misclassified\n- **Information Gain (Entropy)** — Measures reduction in uncertainty\n- **Variance Reduction** — For regression trees\n\n**Problems & Solutions:**\n- **Overfitting** → Pruning, max depth limit\n- **Instability** → Random Forests (ensemble of trees)",
-                "basic_example": "Deciding whether to play tennis based on weather:\n- Is it raining? → Yes → Is it windy? → Yes → Don't play / No → Play\n- Is it raining? → No → Is it sunny? → Yes → Don't play / No → Play\nEach question is a node, and the final decision is a leaf.",
-                "advanced_example": "A telecom company uses a decision tree to predict customer churn. The tree learns: If contract_type = month-to-month AND monthly_charges > $70 AND tenure < 12 months → High churn risk. This gives actionable rules the business can use to retain customers.",
-                "key_points": "• Works for both classification and regression\n• Easy to interpret and visualize\n• Uses Gini Impurity or Entropy for splitting\n• Prone to overfitting → use pruning\n• Ensemble methods (Random Forest, Gradient Boosting) improve performance",
-                "resources": "• StatQuest: Decision Trees playlist\n• 'Hands-On ML' Chapter on Decision Trees\n• scikit-learn Decision Tree guide\n• Visualizing Decision Trees tutorial",
-                "study_time_minutes": 35,
-            },
-            {
-                "name": "Clustering",
-                "difficulty": "medium",
-                "order_number": 6,
-                "description": "Learn unsupervised clustering: K-Means, hierarchical clustering, and applications.",
-                "introduction": "Clustering is an unsupervised learning technique that groups similar data points together. Unlike classification, there are no predefined labels — the algorithm discovers the groups on its own.",
-                "explanation": "Clustering finds hidden structure in unlabeled data.\n\n**K-Means Clustering:**\n1. Choose K (number of clusters)\n2. Randomly place K centroids\n3. Assign each point to the nearest centroid\n4. Move centroids to the center of their clusters\n5. Repeat steps 3-4 until convergence\n\n**Other Methods:**\n- **Hierarchical Clustering** — Builds a tree of clusters (dendrogram)\n- **DBSCAN** — Density-based, finds arbitrarily shaped clusters\n- **Gaussian Mixture Models** — Probabilistic approach\n\n**Choosing K:**\n- **Elbow Method** — Plot inertia vs K, look for the 'elbow'\n- **Silhouette Score** — Measures how similar points are to their own cluster vs other clusters",
-                "basic_example": "Imagine a bag of mixed candies. Without knowing the types, you group them by color — all reds together, all greens together. That's clustering: grouping similar items without knowing the categories in advance.",
-                "advanced_example": "An e-commerce platform uses K-Means to segment customers. Features: spending score, annual income, and purchase frequency. The algorithm reveals 5 customer segments: 'Budget Shoppers', 'Premium Buyers', 'Seasonal Shoppers', etc. Marketing then tailors campaigns to each segment.",
-                "key_points": "• Unsupervised learning — no labels needed\n• K-Means is the most popular clustering algorithm\n• Choose K using Elbow Method or Silhouette Score\n• Hierarchical clustering creates a tree of clusters\n• Applications: customer segmentation, anomaly detection, image compression",
-                "resources": "• StatQuest: K-Means Clustering\n• 'Hands-On ML' chapter on Clustering\n• scikit-learn Clustering guide\n• Visualizing clusters with PCA tutorial",
-                "study_time_minutes": 35,
-            },
-            {
-                "name": "Neural Networks",
-                "difficulty": "hard",
-                "order_number": 7,
-                "description": "Introduction to neural networks: perceptrons, activation functions, backpropagation, and deep learning.",
-                "introduction": "Neural Networks are computing systems inspired by the biological neural networks in the brain. They consist of interconnected nodes (neurons) organized in layers that process information and learn patterns from data.",
-                "explanation": "Neural networks are the foundation of deep learning.\n\n**Structure:**\n- **Input Layer** — Receives the raw data\n- **Hidden Layers** — Process the data through weighted connections\n- **Output Layer** — Produces the final prediction\n\n**Key Concepts:**\n- **Neuron** — Takes inputs, applies weights, adds bias, passes through activation function\n- **Activation Functions:**\n  - ReLU: f(x) = max(0, x) — most common\n  - Sigmoid: f(x) = 1/(1+e^(-x)) — outputs 0 to 1\n  - Softmax: Converts outputs to probabilities\n- **Backpropagation** — Algorithm for updating weights based on error\n- **Learning Rate** — How much weights change per update\n\n**Deep Learning:**\n- Neural networks with many hidden layers\n- Can learn very complex patterns\n- Requires large data and computational power",
-                "basic_example": "Teaching a neural network to recognize handwritten digits (0-9):\n- Input: 28x28 pixel image (784 input neurons)\n- Hidden layers: Learn to detect edges, curves, patterns\n- Output: 10 neurons (one per digit), highest value = prediction\n- After training on thousands of examples, it achieves >97% accuracy",
-                "advanced_example": "A medical imaging system uses a Convolutional Neural Network (CNN) — a specialized neural network — to detect tumors in X-ray images. The network has millions of parameters organized in convolutional layers that detect edges, textures, and shapes hierarchically. It outperforms radiologists in some specific detection tasks.",
-                "key_points": "• Inspired by biological neural networks\n• Consists of input, hidden, and output layers\n• Activation functions add non-linearity (ReLU, Sigmoid)\n• Backpropagation updates weights to minimize error\n• Deep Learning = neural networks with many layers\n• Powers modern AI: image recognition, NLP, game playing",
-                "resources": "• 3Blue1Brown: Neural Networks series (YouTube)\n• 'Deep Learning' by Goodfellow, Bengio, Courville\n• TensorFlow/Keras beginner tutorial\n• Andrej Karpathy's 'Neural Networks: Zero to Hero'",
-                "study_time_minutes": 45,
-            },
-        ]
-
-        for td in topics_data:
-            topic = Topic(subject_id=ml_subject.id, **td)
-            db.add(topic)
-        db.flush()
-
-        # ── Seed hardcoded ML questions for each topic ─────────────
-        ml_questions = _get_ml_questions(ml_subject.id, db)
-        for topic_name, questions in ml_questions.items():
-            topic = db.query(Topic).filter(
-                Topic.subject_id == ml_subject.id, Topic.name == topic_name
-            ).first()
-            if topic:
-                for q in questions:
-                    db.add(Question(topic_id=topic.id, **q))
-
+        _seed_machine_learning_demo(db)
+        _seed_curriculum(db)
         db.commit()
-
     finally:
         db.close()
+
+
+def _seed_curriculum(db: Session):
+    """
+    Attach lessons and questions to every subject that has none.
+
+    Subjects with no topics would show an empty learning path and dead-end the
+    student, so this fills each one from the curriculum package. Keyed by
+    subject name, so duplicated subjects (e.g. Python for B.Tech and BCA)
+    both get populated.
+    """
+    for subject in db.query(Subject).all():
+        already = db.query(Topic).filter(Topic.subject_id == subject.id).count()
+        if already:
+            continue
+
+        bundle = curriculum_for(subject.name)
+        if not bundle:
+            continue
+
+        created = {}
+        for td in bundle["topics"]:
+            topic = Topic(subject_id=subject.id, **td)
+            db.add(topic)
+            created[topic.name] = topic
+        db.flush()
+
+        for topic_name, questions in bundle["questions"].items():
+            topic = created.get(topic_name)
+            if not topic:
+                continue
+            for q in questions:
+                db.add(Question(topic_id=topic.id, **q))
+        db.flush()
+
+
+def _seed_machine_learning_demo(db: Session):
+    """Create the demo student and the Machine Learning subject if absent."""
+    # Skip if already seeded
+    if db.query(Subject).filter(Subject.name == "Machine Learning").first():
+        return
+
+    # ── Demo User ──────────────────────────────────────────────
+    demo_user = User(
+        name="Demo Student",
+        email="demo@adaptivelearn.com",
+        password=hash_password("demo123"),
+    )
+    db.add(demo_user)
+    db.flush()
+
+    # ── Subjects ───────────────────────────────────────────────
+    ml_subject = Subject(
+        name="Machine Learning",
+        department="Information Technology",
+        education="B.Tech",
+        year="2nd Year",
+    )
+    db.add(ml_subject)
+    db.flush()
+
+    # Additional subjects for variety
+    for subj_data in [
+        ("Python Programming", "Computer Science", "B.Tech", "1st Year"),
+        ("Data Structures", "Computer Science", "B.Tech", "2nd Year"),
+        ("Database Management Systems", "Information Technology", "B.Tech", "2nd Year"),
+        ("Computer Networks", "Information Technology", "B.Tech", "3rd Year"),
+        ("Operating Systems", "Computer Science", "B.Tech", "3rd Year"),
+        ("Python Programming", "Computer Science", "BCA", "1st Year"),
+        ("Data Structures", "Information Technology", "BCA", "2nd Year"),
+        ("Machine Learning", "Computer Science", "MCA", "2nd Year"),
+    ]:
+        db.add(Subject(name=subj_data[0], department=subj_data[1], education=subj_data[2], year=subj_data[3]))
+    # The session is created with autoflush=False, so these rows must be
+    # flushed explicitly before the queries below can see them.
+    db.flush()
+
+    # ── ML Topics ──────────────────────────────────────────────
+    topics_data = [
+        {
+            "name": "Introduction to Machine Learning",
+            "difficulty": "easy",
+            "order_number": 1,
+            "description": "Understand what Machine Learning is, its history, types, and applications.",
+            "introduction": "Machine Learning is a subset of Artificial Intelligence that enables systems to learn and improve from experience without being explicitly programmed. It focuses on developing algorithms that can access data and use it to learn for themselves.",
+            "explanation": "Machine Learning (ML) is the science of teaching computers to recognize patterns in data and make decisions with minimal human intervention. Instead of writing explicit rules, we provide examples (training data), and the algorithm figures out the rules on its own.\n\nThere are three main types:\n1. **Supervised Learning** — Learning from labeled examples (e.g., classifying emails as spam or not spam)\n2. **Unsupervised Learning** — Finding hidden patterns in unlabeled data (e.g., grouping customers by behavior)\n3. **Reinforcement Learning** — Learning through trial and error with rewards (e.g., a robot learning to walk)",
+            "basic_example": "Imagine you want to teach a computer to distinguish between apples and oranges. Instead of writing rules about color, size, and shape, you show it hundreds of labeled images of apples and oranges. The computer learns the patterns itself — this is Machine Learning in its simplest form.",
+            "advanced_example": "Netflix uses ML to recommend shows. It analyzes your viewing history, compares it with millions of other users, and predicts what you'd enjoy watching next. The algorithm continuously improves as more data becomes available, making recommendations more accurate over time.",
+            "key_points": "• ML is a subset of AI focused on learning from data\n• Three main types: Supervised, Unsupervised, Reinforcement\n• Requires quality data for good performance\n• Used in recommendation systems, image recognition, NLP, and more\n• The model improves with more data and experience",
+            "resources": "• Andrew Ng's Machine Learning Course (Coursera)\n• 'Hands-On Machine Learning' by Aurélien Géron\n• scikit-learn documentation\n• Google ML Crash Course",
+            "study_time_minutes": 30,
+        },
+        {
+            "name": "Supervised Learning",
+            "difficulty": "easy",
+            "order_number": 2,
+            "description": "Learn about supervised learning: classification, regression, training, and evaluation.",
+            "introduction": "Supervised Learning is the most common type of Machine Learning. In supervised learning, the algorithm learns from labeled training data — each example comes with the correct answer (label). The goal is to learn a mapping function from inputs to outputs.",
+            "explanation": "In Supervised Learning, we train a model using input-output pairs. Think of it like a student learning with an answer key.\n\n**Two main categories:**\n1. **Classification** — Predicting a category (discrete output)\n   - Email spam detection (spam / not spam)\n   - Image classification (cat / dog / bird)\n   - Disease diagnosis (positive / negative)\n\n2. **Regression** — Predicting a number (continuous output)\n   - House price prediction\n   - Temperature forecasting\n   - Stock price estimation\n\n**Key concepts:**\n- **Training Set** — Data used to train the model\n- **Test Set** — Data used to evaluate performance\n- **Overfitting** — Model memorizes training data but fails on new data\n- **Underfitting** — Model is too simple to capture patterns",
+            "basic_example": "A teacher shows a student 100 flashcards with animals and their names. After studying these labeled examples, the student can identify new animals they've never seen before. This is how supervised learning works — learning from labeled examples.",
+            "advanced_example": "A bank wants to predict loan defaults. They use historical data (income, credit score, employment history → defaulted or not) to train a classifier. The model learns patterns: low credit score + high debt = likely default. When a new application comes in, the model predicts the probability of default.",
+            "key_points": "• Uses labeled training data (input → output pairs)\n• Classification predicts categories, Regression predicts numbers\n• Requires splitting data into training and test sets\n• Watch out for overfitting and underfitting\n• Common algorithms: Linear Regression, Decision Trees, SVM, Neural Networks",
+            "resources": "• StatQuest YouTube series on ML\n• 'Pattern Recognition and Machine Learning' by Bishop\n• Kaggle supervised learning tutorials\n• scikit-learn classification and regression guides",
+            "study_time_minutes": 35,
+        },
+        {
+            "name": "Regression",
+            "difficulty": "medium",
+            "order_number": 3,
+            "description": "Understand regression techniques: linear regression, polynomial regression, and evaluation metrics.",
+            "introduction": "Regression is a supervised learning technique used to predict continuous numerical values. The most common form is Linear Regression, which finds the best-fit line through the data points.",
+            "explanation": "Regression helps us answer 'how much?' or 'how many?' questions.\n\n**Linear Regression:**\n- Finds the equation: y = mx + b (a straight line)\n- 'm' is the slope (how much y changes per unit of x)\n- 'b' is the intercept (value of y when x = 0)\n- Goal: minimize the error between predicted and actual values\n\n**Evaluation Metrics:**\n- **MSE** (Mean Squared Error) — Average of squared differences\n- **RMSE** (Root Mean Squared Error) — Square root of MSE\n- **R² Score** — How well the model fits (1.0 = perfect)\n\n**Polynomial Regression:**\n- When data isn't linear, we can fit a curve\n- Uses polynomial features (x², x³, etc.)\n- More flexible but risks overfitting",
+            "basic_example": "Predicting house prices based on size. If you plot size (x-axis) vs price (y-axis), linear regression draws the best straight line through all the data points. A 1000 sq ft house might be predicted at $200,000, a 2000 sq ft at $400,000, etc.",
+            "advanced_example": "A company predicts monthly revenue using multiple features: advertising spend, number of employees, and season. This is Multiple Linear Regression: Revenue = β₀ + β₁(ads) + β₂(employees) + β₃(season). Each coefficient tells how much that factor contributes to revenue.",
+            "key_points": "• Predicts continuous numerical values\n• Linear Regression finds the best-fit line\n- Key metrics: MSE, RMSE, R² Score\n• Polynomial Regression handles non-linear data\n• Multiple Regression uses multiple input features",
+            "resources": "• Khan Academy — Regression analysis\n• 'An Introduction to Statistical Learning' (Chapter 3)\n• StatQuest: Linear Regression playlist\n• scikit-learn Linear Regression tutorial",
+            "study_time_minutes": 40,
+        },
+        {
+            "name": "Classification",
+            "difficulty": "medium",
+            "order_number": 4,
+            "description": "Learn classification algorithms: logistic regression, KNN, and evaluation metrics.",
+            "introduction": "Classification is a supervised learning technique used to predict discrete categories or classes. It assigns data points to one of several predefined groups based on their features.",
+            "explanation": "Classification answers 'which category?' questions.\n\n**Common Algorithms:**\n1. **Logistic Regression** — Despite the name, it's for classification. Uses sigmoid function to output probabilities between 0 and 1.\n2. **K-Nearest Neighbors (KNN)** — Classifies based on the majority class of K nearest data points.\n3. **Support Vector Machine (SVM)** — Finds the best boundary (hyperplane) between classes.\n\n**Evaluation Metrics:**\n- **Accuracy** — % of correct predictions\n- **Precision** — Of all positive predictions, how many were correct?\n- **Recall** — Of all actual positives, how many did we catch?\n- **F1 Score** — Harmonic mean of Precision and Recall\n- **Confusion Matrix** — Table showing true/false positives and negatives",
+            "basic_example": "Email spam detection: The algorithm looks at features like sender address, subject line keywords, and attachments. Based on patterns from thousands of labeled emails, it classifies new emails as 'spam' or 'not spam'.",
+            "advanced_example": "A hospital uses classification to predict whether a tumor is benign or malignant. Features include size, shape, texture, and growth rate. The model (e.g., SVM) learns from thousands of past cases. High recall is critical here — missing a malignant tumor (false negative) is far worse than a false alarm.",
+            "key_points": "• Predicts discrete categories/classes\n• Logistic Regression uses sigmoid for probability output\n• KNN classifies by majority vote of nearest neighbors\n• Key metrics: Accuracy, Precision, Recall, F1 Score\n• Confusion Matrix provides detailed error analysis",
+            "resources": "• 'StatQuest: Classification' YouTube series\n• scikit-learn classification guide\n• Kaggle Titanic classification challenge\n• Andrew Ng's classification lecture notes",
+            "study_time_minutes": 40,
+        },
+        {
+            "name": "Decision Trees",
+            "difficulty": "medium",
+            "order_number": 5,
+            "description": "Understand decision trees, splitting criteria, pruning, and ensemble methods.",
+            "introduction": "Decision Trees are versatile ML algorithms that can be used for both classification and regression. They work by recursively splitting the data based on feature values, creating a tree-like structure of decisions.",
+            "explanation": "A Decision Tree is like a flowchart of questions that lead to a decision.\n\n**How it works:**\n1. Start at the root node (all data)\n2. Find the best feature to split on (maximizes information gain)\n3. Split the data into subsets\n4. Repeat for each subset (recursive splitting)\n5. Stop when a condition is met (max depth, min samples)\n\n**Splitting Criteria:**\n- **Gini Impurity** — Measures how often a random element would be misclassified\n- **Information Gain (Entropy)** — Measures reduction in uncertainty\n- **Variance Reduction** — For regression trees\n\n**Problems & Solutions:**\n- **Overfitting** → Pruning, max depth limit\n- **Instability** → Random Forests (ensemble of trees)",
+            "basic_example": "Deciding whether to play tennis based on weather:\n- Is it raining? → Yes → Is it windy? → Yes → Don't play / No → Play\n- Is it raining? → No → Is it sunny? → Yes → Don't play / No → Play\nEach question is a node, and the final decision is a leaf.",
+            "advanced_example": "A telecom company uses a decision tree to predict customer churn. The tree learns: If contract_type = month-to-month AND monthly_charges > $70 AND tenure < 12 months → High churn risk. This gives actionable rules the business can use to retain customers.",
+            "key_points": "• Works for both classification and regression\n• Easy to interpret and visualize\n• Uses Gini Impurity or Entropy for splitting\n• Prone to overfitting → use pruning\n• Ensemble methods (Random Forest, Gradient Boosting) improve performance",
+            "resources": "• StatQuest: Decision Trees playlist\n• 'Hands-On ML' Chapter on Decision Trees\n• scikit-learn Decision Tree guide\n• Visualizing Decision Trees tutorial",
+            "study_time_minutes": 35,
+        },
+        {
+            "name": "Clustering",
+            "difficulty": "medium",
+            "order_number": 6,
+            "description": "Learn unsupervised clustering: K-Means, hierarchical clustering, and applications.",
+            "introduction": "Clustering is an unsupervised learning technique that groups similar data points together. Unlike classification, there are no predefined labels — the algorithm discovers the groups on its own.",
+            "explanation": "Clustering finds hidden structure in unlabeled data.\n\n**K-Means Clustering:**\n1. Choose K (number of clusters)\n2. Randomly place K centroids\n3. Assign each point to the nearest centroid\n4. Move centroids to the center of their clusters\n5. Repeat steps 3-4 until convergence\n\n**Other Methods:**\n- **Hierarchical Clustering** — Builds a tree of clusters (dendrogram)\n- **DBSCAN** — Density-based, finds arbitrarily shaped clusters\n- **Gaussian Mixture Models** — Probabilistic approach\n\n**Choosing K:**\n- **Elbow Method** — Plot inertia vs K, look for the 'elbow'\n- **Silhouette Score** — Measures how similar points are to their own cluster vs other clusters",
+            "basic_example": "Imagine a bag of mixed candies. Without knowing the types, you group them by color — all reds together, all greens together. That's clustering: grouping similar items without knowing the categories in advance.",
+            "advanced_example": "An e-commerce platform uses K-Means to segment customers. Features: spending score, annual income, and purchase frequency. The algorithm reveals 5 customer segments: 'Budget Shoppers', 'Premium Buyers', 'Seasonal Shoppers', etc. Marketing then tailors campaigns to each segment.",
+            "key_points": "• Unsupervised learning — no labels needed\n• K-Means is the most popular clustering algorithm\n• Choose K using Elbow Method or Silhouette Score\n• Hierarchical clustering creates a tree of clusters\n• Applications: customer segmentation, anomaly detection, image compression",
+            "resources": "• StatQuest: K-Means Clustering\n• 'Hands-On ML' chapter on Clustering\n• scikit-learn Clustering guide\n• Visualizing clusters with PCA tutorial",
+            "study_time_minutes": 35,
+        },
+        {
+            "name": "Neural Networks",
+            "difficulty": "hard",
+            "order_number": 7,
+            "description": "Introduction to neural networks: perceptrons, activation functions, backpropagation, and deep learning.",
+            "introduction": "Neural Networks are computing systems inspired by the biological neural networks in the brain. They consist of interconnected nodes (neurons) organized in layers that process information and learn patterns from data.",
+            "explanation": "Neural networks are the foundation of deep learning.\n\n**Structure:**\n- **Input Layer** — Receives the raw data\n- **Hidden Layers** — Process the data through weighted connections\n- **Output Layer** — Produces the final prediction\n\n**Key Concepts:**\n- **Neuron** — Takes inputs, applies weights, adds bias, passes through activation function\n- **Activation Functions:**\n  - ReLU: f(x) = max(0, x) — most common\n  - Sigmoid: f(x) = 1/(1+e^(-x)) — outputs 0 to 1\n  - Softmax: Converts outputs to probabilities\n- **Backpropagation** — Algorithm for updating weights based on error\n- **Learning Rate** — How much weights change per update\n\n**Deep Learning:**\n- Neural networks with many hidden layers\n- Can learn very complex patterns\n- Requires large data and computational power",
+            "basic_example": "Teaching a neural network to recognize handwritten digits (0-9):\n- Input: 28x28 pixel image (784 input neurons)\n- Hidden layers: Learn to detect edges, curves, patterns\n- Output: 10 neurons (one per digit), highest value = prediction\n- After training on thousands of examples, it achieves >97% accuracy",
+            "advanced_example": "A medical imaging system uses a Convolutional Neural Network (CNN) — a specialized neural network — to detect tumors in X-ray images. The network has millions of parameters organized in convolutional layers that detect edges, textures, and shapes hierarchically. It outperforms radiologists in some specific detection tasks.",
+            "key_points": "• Inspired by biological neural networks\n• Consists of input, hidden, and output layers\n• Activation functions add non-linearity (ReLU, Sigmoid)\n• Backpropagation updates weights to minimize error\n• Deep Learning = neural networks with many layers\n• Powers modern AI: image recognition, NLP, game playing",
+            "resources": "• 3Blue1Brown: Neural Networks series (YouTube)\n• 'Deep Learning' by Goodfellow, Bengio, Courville\n• TensorFlow/Keras beginner tutorial\n• Andrej Karpathy's 'Neural Networks: Zero to Hero'",
+            "study_time_minutes": 45,
+        },
+    ]
+
+    ml_questions = _get_ml_questions(ml_subject.id, db)
+
+    # "Machine Learning" appears for both B.Tech and MCA, so attach the same
+    # lessons and questions to every Machine Learning subject row.
+    for subj in db.query(Subject).filter(Subject.name == "Machine Learning").all():
+        created = {}
+        for td in topics_data:
+            topic = Topic(subject_id=subj.id, **td)
+            db.add(topic)
+            created[td["name"]] = topic
+        db.flush()
+
+        for topic_name, questions in ml_questions.items():
+            topic = created.get(topic_name)
+            if not topic:
+                continue
+            for q in questions:
+                db.add(Question(topic_id=topic.id, **q))
+        db.flush()
 
 
 def _get_ml_questions(subject_id, db):
